@@ -3,6 +3,7 @@ from matplotlib import pyplot as plt
 from numba import types
 import numba as nb
 import os
+import pickle
 
 from . import utils
 
@@ -10,18 +11,16 @@ data_dir = os.path.dirname(os.path.realpath(__file__))+'/data/'
 
 def create_impact_velocity_sampler():
 
-    v, P = np.loadtxt(data_dir+'velocity_distribution.txt').T
-    P = np.clip(P, a_min=0.0, a_max = np.inf)
-    
-    v_bins = np.linspace(0,70,1000)
-    v_center = (v_bins[1:] + v_bins[:-1])/2
-    P_new = np.interp(v_center, v, P)
-    
-    hist_cumulative = np.cumsum(P_new / P_new.sum())
+    # computed from velocities of observed near Earth asteroids.
+    # https://ssd-api.jpl.nasa.gov/doc/cad.html
+    with open(data_dir+'velocities.pkl','rb') as f:
+        out = pickle.load(f)
+        hist_cumulative = out['hist_cumulative']
+        bin_middle = out['bin_middle']
     
     @nb.njit()
     def sampler(size = 1):
-        return np.interp(np.random.uniform(0, 1, size = size), hist_cumulative, v_center)
+        return np.interp(np.random.uniform(0, 1, size = size), hist_cumulative, bin_middle)
 
     return sampler
 
@@ -213,6 +212,7 @@ class ImpactMonteCarlo():
     def time_of_last_mass_range(self, N, mass_rng):
         
         time = np.ones(N.shape[0])*4.5
+        mass = np.zeros(N.shape[0])*np.nan
         
         for i in range(N.shape[0]):
             for j in range(self.time_grid.shape[0] - 1):
@@ -220,9 +220,24 @@ class ImpactMonteCarlo():
                     if mass_rng[0] < self.mass_grid_avg[k] < mass_rng[1] and \
                        N[i,j,k] > 0 and self.time_grid_avg[j] < time[i]:
                         time[i] = self.time_grid_avg[j]
+                        mass[i] = self.mass_grid_avg[k]
                     
-        return time
-    
+        return time, mass
+
+    def mass_of_biggest_impact(self, N):
+
+        M = np.empty(N.shape[0])
+
+        for i in range(N.shape[0]):
+            m = 0.0
+            for j in range(self.time_grid.shape[0] - 1):
+                for k in range(self.mass_grid.shape[0] - 1):
+                    if self.mass_grid_avg[k] > m and N[i,j,k] > 0:
+                        m = self.mass_grid_avg[k]
+            M[i] = m
+        
+        return M
+
     def number_of_impacts_in_interval(self, av, mass_rng, theta_rng, v_rng):
         
         if mass_rng[0] < av.mass_min:
@@ -254,6 +269,7 @@ class ImpactMonteCarlo():
             raise Exception('The mass_rng exceeds the mass bounds in sampled angles and velocities')
             
         time = np.ones(av.inds_start.shape[0])*4.5
+        mass = np.zeros(av.inds_start.shape[0])*np.nan
                 
         for i in range(av.inds_start.shape[0]):
             for j in range(self.time_grid.shape[0] - 1):
@@ -271,8 +287,9 @@ class ImpactMonteCarlo():
                             if theta_rng[0] < angles[ii] < theta_rng[1] and v_rng[0] < v[ii] < v_rng[1]:
                                 if self.time_grid_avg[j] < time[i]:
                                     time[i] = self.time_grid_avg[j]
+                                    mass[i] = self.mass_grid_avg[k]
                     
-        return time
+        return time, mass
 
     def number_of_impacts_in_energy_interval(self, av, energy_rng, theta_rng):
         
@@ -300,6 +317,7 @@ class ImpactMonteCarlo():
     def time_of_last_in_energy_interval(self, av, energy_rng, theta_rng):
         
         time = np.ones(av.inds_start.shape[0])*4.5
+        mass = np.zeros(av.inds_start.shape[0])*np.nan
                 
         for i in range(av.inds_start.shape[0]):
             for j in range(self.time_grid.shape[0] - 1):
@@ -318,5 +336,6 @@ class ImpactMonteCarlo():
                         if theta_rng[0] < angles[ii] < theta_rng[1] and energy_rng[0] < energy < energy_rng[1]:
                             if self.time_grid_avg[j] < time[i]:
                                 time[i] = self.time_grid_avg[j]
+                                mass[i] = self.mass_grid_avg[k]
                     
-        return time
+        return time, mass
