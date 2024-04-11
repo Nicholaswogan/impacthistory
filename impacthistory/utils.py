@@ -19,74 +19,34 @@ def num_lunar_crater_bigger_1km_per_area(t, a, b, c):
 
 # SFD of main belt asteroids
 
-def morbidelli_SFD_scaled_to_1km_lunar():
-    """Scale the main belt SFD to a asteroid that creates a 
-    1 km crater on the moon. I follow Morbidelli et al (2018), 
-    Sec. 2.2, assuming the projectile has certain density and 
-    diameter."""
-    rho_p = 2.5e12 # kg/km^3
-    D_projectile = 50e-3 # km
-    m0 = diameter_to_mass(D_projectile, rho_p)
-    SFD_masses, SFD_frequency = morbidelli_SFD_scaled_to_mass(m0)
-    return SFD_masses, SFD_frequency
-
 def marchi_SFD_scaled_to_1km_lunar():
     """Scale the main belt SFD to a asteroid that creates a 
     1 km crater on the moon. I follow Morbidelli et al (2018), 
     Sec. 2.2, assuming the projectile has certain density and 
     diameter."""
     rho_p = 2.5e12 # kg/km^3
-    D_projectile = 50e-3 # km
+    D_projectile = 41.0e-3 # km
     m0 = diameter_to_mass(D_projectile, rho_p)
     SFD_masses, SFD_frequency = marchi_SFD_scaled_to_mass(m0)
     return SFD_masses, SFD_frequency
-
-def morbidelli_SFD_scaled_to_mass(m0):
-    
-    # Table 1, Morbidelli et al. (2018).
-    # The first element is given by the ratio of 1 to 20 km craters
-    # on the Moon (num >1 km/num >20 km = 1400). 
-    # See page 265 in Morbidelli et al. (2018) text under
-    # Table 1.
-    D = np.array([50.0e-3, 1, 10, 12, 18, 75, 900])
-    S = np.array([1100000*1400, 1100000,8000,5400,2500,370,1])
-    
-    # Convert to impact mass
-    rho_p = 2.5e12 # kg/km^3 from Morbidelli et al. (2018)
-    M = diameter_to_mass(D, rho_p)
-    
-    # Extrapolate SFD down to 1 kg. If the smallest element is bigger
-    # than 1 kg
-    if M[0] > 1.0:
-        a = interpolate.interp1d(np.log10(M), np.log10(S),fill_value='extrapolate')
-        S_1kg = 10.0**a(np.log10(1.0)).item()
-        M = np.append(1.0,M)
-        S = np.append(S_1kg,S)
-    
-    # Rescale SFD so that it is equal to 1 at m0
-    a = interpolate.interp1d(np.log10(M), np.log10(S),fill_value='extrapolate')    
-    S0 = 10.0**a(np.log10(m0)).item()
-    S = S/S0
-    
-    return M, S
 
 def marchi_SFD_scaled_to_mass(m0):
     
     # Extended Data Figure 1 in Marchi et al. (2014)
     D, f = np.loadtxt(data_dir+'Marchi2014_SFD.txt').T
     
-    # Here we find the frequency at a 1 km object. The frequency of 
-    # a 50 m object should be a factor of 1400 more based on observations
+    # Here we find the frequency at a 1220 m object. The frequency of 
+    # a 41 m object should be a factor of 1400 more based on observations
     # of craters on the Moon. See Morbidelli et al. (2018), text under
-    # Table 1.
+    # Table 1. Also, see Marchi (2021), ApJ
     a = interpolate.interp1d(np.log10(D), np.log10(f),fill_value='extrapolate')
-    f_1_km = 10.0**a(np.log10(1.0)).item()
-    f_50_m = f_1_km*1400
-    D_50_m = 50.0e-3
-    if D[0] < D_50_m:
+    f_1220_m = 10.0**a(np.log10(1220.0e-3)).item()
+    f_41_m = f_1220_m*1400
+    D_41_m = 41.0e-3
+    if D[0] < D_41_m:
         raise Exception("Problem building Marchi SFD.")
-    D = np.append(D_50_m, D)
-    f = np.append(f_50_m, f)
+    D = np.append(D_41_m, D)
+    f = np.append(f_41_m, f)
     
     # Convert to impact mass
     rho_p = 2.5e12 # kg/km^3 from Morbidelli et al. (2018)
